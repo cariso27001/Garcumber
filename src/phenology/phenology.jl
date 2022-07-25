@@ -2,27 +2,24 @@ include("stage.jl")
 include("planting.jl")
 include("emergence.jl")
 include("germination.jl")
-include("floralinitiation.jl")
 include("leafinitiation.jl")
 include("leafappearance.jl")
-# include("bulbappearance.jl")
-# include("scapegrowth.jl")
+include("floralinitiation.jl")
+include("floralappearance.jl")
+include("fruitinitiation.jl")
+include("fruitappearance.jl")
 include("death.jl")
 
-#TODO make a common class to be shared by Garlic and MAIZSIM
+
 @system Phenology(
     Planting,
     Emergence,
     Germination,
-    FloralInitiation,
     LeafInitiation,
     LeafAppearance,
-    # BulbAppearance,
-    # ScapeGrowth,
-    # ScapeAppearance,
-    # ScapeRemoval,
-    # FlowerAppearance,
-    # BulbilAppearance,
+    FloralInitiation,
+    FloralAppearance,
+    FruitAppearance,
     Death
 ) begin
     calendar ~ ::Calendar(override)
@@ -36,6 +33,10 @@ include("death.jl")
     leaves_generic => 10 ~ preserve::int(parameter)
     leaves_potential(leaves_total) ~ track::int(min=leaves_generic)
     leaves_total(leaves_initiated) ~ track::int
+
+    fruits_generic => 10 ~ preserve::int(parameter)
+    fruits_potential(fruits_total) ~ track::int(min=fruits_generic)
+    fruits_total(fruits_initiated) ~ track::int
 
     T(leaves_appeared, T_air=weather.T_air): temperature => begin
         if leaves_appeared < 9
@@ -82,22 +83,19 @@ include("death.jl")
     # end ~ track::str
 
     # development_phase(germinated, floral_initiated, dead, scape_removed, scape_appeared) => begin
-    development_phase(germinated, floral_initiated, dead) => begin
+    development_phase(germinated, floral_initiating, fruit_initiating, dead) => begin
         if !germinated
             :seed
-        elseif !floral_initiated
+        elseif !floral_initiating
             :vegetative
-        # elseif dead
         else
-            :dead
-        # elseif !scape_removed
-        #     if !scape_appeared
-        #         :bulb_growth_before_scape_appearance
-        #     else
-        #         :bulb_growth_after_scape_appearance
-        #     end
-        # else
-        #     :bulb_growth_after_scape_removal
+            if !fruit_initiating
+                :flowering_started
+            elseif fruit_initiating
+                :fruiting_started
+            else
+                :dead
+            end
         end
     end ~ track::sym
 end
