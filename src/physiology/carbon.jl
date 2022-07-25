@@ -138,16 +138,15 @@ end
     end ~ track(u"g/d")
 
     pt: partitioning_table => [
-        # root leaf sheath scape bulb
-          0.00 0.00   0.00  0.00 0.00 ; # seed garlic before germination
-          0.35 0.30   0.25  0.00 0.10 ; # vegetative stage between germination and scape initiation
-          0.15 0.15   0.10  0.25 0.35 ; # period between scape initiation and scape appearance
-          0.05 0.10   0.00  0.35 0.50 ; # period after scape appearance before removal (scape stays intact)
-          0.05 0.00   0.00  0.00 0.95 ; # period after scape removal (scape appeared and subsequently removed)
+        # root leaf   stem  flower fruit
+          0.00 0.00   0.00  0.00 0.00 ; # seed
+          0.35 0.30   0.25  0.00 0.10 ; # vegetative stage
+          0.20 0.20   0.20  0.40 0.00 ; # flowering_started
+          0.10 0.10   0.10  0.30 0.40 ; # fruiting_started
           0.00 0.00   0.00  0.00 0.00 ; # dead
     ] ~ tabulate(
-        rows=(:seed, :vegetative, :bulb_growth_before_scape_appearance, :bulb_growth_after_scape_appearance, :bulb_growth_after_scape_removal, :dead),
-        columns=(:root, :leaf, :sheath, :scape, :bulb),
+        rows=(:seed, :vegetative, :flowering_started, :fruiting_started, :dead),
+        columns=(:root, :leaf, :stem, :flower, :fruit),
         parameter
     )
 
@@ -159,19 +158,19 @@ end
         total_carbon - root_carbon
     end ~ track(u"g/d")
 
+    stem_carbon(total_carbon,  pt, dp) => begin
+        total_carbon * pt[dp].stem
+    end ~ track(u"g/d")
+
     leaf_carbon(total_carbon, pt, dp) => begin
         total_carbon * pt[dp].leaf
     end ~ track(u"g/d")
 
-    sheath_carbon(total_carbon, pt, dp) => begin
-        total_carbon * pt[dp].sheath
+    flower_carbon(total_carbon, pt, dp) => begin
+        total_carbon * pt[dp].flower
     end ~ track(u"g/d")
 
-    scape_carbon(total_carbon, pt, dp) => begin
-        total_carbon * pt[dp].scape
-    end ~ track(u"g/d")
-
-    bulb_carbon(total_carbon, pt, dp) => begin
-        total_carbon * pt[dp].bulb
+    fruit_carbon(total_carbon, pt, dp) => begin
+        total_carbon * pt[dp].fruit
     end ~ track(u"g/d")
 end

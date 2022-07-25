@@ -8,9 +8,9 @@
     shoot_carbon ~ hold
     root_carbon ~ hold
     leaf_carbon ~ hold
-    sheath_carbon ~ hold
-    # scape_carbon ~ hold
-    # bulb_carbon ~ hold
+    stem_carbon ~ hold
+    flower_carbon ~ hold
+    fruit_carbon ~ hold
     nonstructural_carbon_mass ~ hold
 
     agefn ~ hold
@@ -33,7 +33,7 @@
     end ~ accumulate(init=initial_seed_mass, u"g")
 
     #stem(x=NU["*"].stem.mass) => begin # for maize
-    total_sheath_mass(x=NU["*"].sheath.mass) => begin # for garlic
+    total_fruit_mass(x=NU["*"].fruit.mass) => begin # for garlic
         # dt the addition of C_reserve here only serves to maintain a total for the mass. It could have just as easily been added to total mass.
         # C_reserve is added to stem here to represent soluble TNC, SK
         #sum(typeof(0.0u"g")[nu.stem.mass' for nu in NU]) + self.p.carbon.reserve
@@ -73,7 +73,7 @@
 
     root_mass(root_carbon) ~ accumulate(u"g")
     leaf_mass(leaf_carbon) ~ accumulate(u"g")
-    # sheath_mass(sheath_carbon) ~ accumulate(u"g")
+    fruit_mass(fruit_carbon) ~ accumulate(u"g")
     # scape_mass(scape_carbon) ~ accumulate(u"g", when=!pheno.scape_removed)
     # visible_scape_mass(scape_carbon) ~ accumulate(u"g", when=pheno.scape_appeared & !pheno.scape_removed)
 

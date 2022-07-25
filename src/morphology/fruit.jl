@@ -1,128 +1,51 @@
-#TODO: rename *temperature to more genereral terms
-@system LeafLengthTracker(BetaFunction) begin
-    pheno: phenology ~ ::Phenology(override)
-    T: temperature ~ ::int(override)
-    #FIXME: leaves_potential is already max(leaves_generic, leaves_total)?
-    n(np=pheno.leaves_potential, ng=pheno.leaves_generic): leaf_count => max(np, ng) ~ track
-    Tn: minimum_temperature => 0 ~ preserve
-    To(n): optimal_temperature => 0.88n ~ preserve
-    Tx(n): maximum_temperature => 1.64n ~ preserve
-end
+### HACK: Cucumber fruit elongate like garlic leaves
 
-@system LeafColdInjury begin
-    T: temperature ~ hold
-
-    _a: cold_injury_factor1 => -0.1 ~ preserve(u"K^-1", parameter)
-    _b: cold_injury_factor2 => 1.6 ~ preserve(parameter)
-    _Tc: cold_injury_critical_temperature => 0 ~ preserve(u"°C", parameter)
-
-    CID(T, _Tc): cold_injury_duration => begin
-        T < Tc ? 1 : -1
-    end ~ accumulate(u"hr", min=0)
-
-    "preliminary cold injury effect (2019-05-23: KDY)"
-    ACIE(_a, _b, _Tc, T, CID): apparent_cold_injury_effect => begin
-        a = T < Tc ? log(a * (T - Tc) + b) : 0
-        1 - a / exp(1u"hr" / CID)
-    end ~ track(min=0, max=1)
-
-    _enable => true ~ flag(parameter)
-
-    CIE(CIE, ACIE, CID): cold_injury_effect => begin
-        iszero(CID) ? 1 : min(CIE, ACIE)
-    end ~ track(init=1, when=_enable)
-end
-
-@system Leaf(Organ, LeafColdInjury) begin
+@system Fruit(Organ) begin
     rank ~ ::int(override) # preserve
 
-    LDR: leaf_detaching_rate => 30 ~ preserve::int(parameter)
+    FRER_max: maximum_fruit_elongation_rate => 12 ~ preserve(u"cm/d", parameter)
 
-    # cm dd-1 Fournier and Andrieu 1998 Pg239.
-    # This is the "potential" elongation rate with no water stress Yang
-    # elongation_rate => 0.564 ~ preserve(u"cm/d", parameter)
+    LM_min_fruit: minimum_length_of_longest_fruit => 30 ~ preserve(u"cm", parameter)
 
-    # max elongation rate (cm per day) at optimal temperature
-    # (Topt: 31C with Tbase = 9.8C using 0.564 cm/dd rate from Fournier 1998 paper above
-    LER_max: maximum_elongation_rate => 12 ~ preserve(u"cm/d", parameter)
+    DM_min_fruit: minimum_diameter_of_largest_fruit => 45 ~ preserve(u"mm", parameter)
 
-    LM_min: minimum_length_of_longest_leaf => 60 ~ preserve(u"cm", parameter)
-
-    # leaf lamina width to length ratio
-    length_to_width_ratio => begin
-        #0.106 # for maize
-        # 0.05 # for garlic
-        1 # for cucumber
-    end ~ preserve(parameter)
-
-    # leaf area coeff with respect to L*W (A_LW)
-    area_ratio => 0.75 ~ preserve(parameter)
-
-    # staygreen trait of the hybrid
-    # stay green for this value times growth period after peaking before senescence begins
-    # An analogy for this is that with no other stresses involved,
-    # it takes 15 years to grow up, stays active for 60 years,
-    # and age the last 15 year if it were for a 90 year life span creature.
-    # Once fully grown, the clock works differently so that the hotter it is quicker it ages
     SG: stay_green => 3.5 ~ preserve(parameter)
 
-    maximum_aging_rate(LER_max) => LER_max ~ track(u"cm/d")
+    maximum_aging_rate(FRER_max) => FRER_max ~ track(u"cm/d")
 
-    #############
-    # Variables #
-    #############
 
-    #FIXME
-    potential_leaves(pheno.leaves_potential) ~ track
-
-    #FIXME
-    extra_leaves(np=potential_leaves, ng=pheno.leaves_generic) => (np - ng) ~ track
-
-    k: maximum_length_of_longest_leaf_adjustment => begin
-        # no length adjustment necessary for garlic, unlike MAIZE (KY, 2016-10-12)
-        # 24.0
-        0
-    end ~ preserve(u"cm^2", parameter)
-
-    maximum_length(LM_min, extra_leaves, k): maximum_length_of_longest_leaf => begin
-        sqrt(LM_min^2 + k * extra_leaves)
+    maximum_length(LM_min_fruit): maximum_length_of_longest_fruit => begin
+        LM_min_fruit
     end ~ track(u"cm")
 
-    maximum_width(l=maximum_length, r=length_to_width_ratio) => begin
-        # Fournier and Andrieu(1998) Pg242 YY
-        l * r
-    end ~ track(u"cm")
+    maximum_diameter(DM_min_fruit) => begin
+        DM_min_fruit
+    end ~ track(u"mm")
 
-    maximum_area(l=maximum_length, w=maximum_width, r=area_ratio) => begin
-        # daughtry and hollinger (1984) Fournier and Andrieu(1998) Pg242 YY
-        l * w * r
-    end ~ track(u"cm^2")
+    maximum_volume(l=maximum_length, d=maximum_diameter) => begin
+        l * π * (d/2)^2
+    end ~ track(u"cm^3")
 
-    # area_from_length(; L(u"cm")) => begin
-    #     #HACK ensure zero area for zero length
-    #     # for garlic, see JH's thesis
-    #     l = Cropbox.deunitfy(L)
-    #     iszero(l) ? l : 0.639945 + 0.954957l + 0.005920l^2
-    # end ~ call(u"cm^2")
-
-    area_from_length(; L(u"cm")) => begin
+    volume_from_length(; L(u"cm")) => begin
         #HACK ensure zero area for zero length
         # for garlic, see JH's thesis
         l = Cropbox.deunitfy(L)
         iszero(l) ? l : 0.639945 + 0.954957l + 0.005920l^2
-    end ~ call(u"cm^2")
+    end ~ call(u"cm^3")
 
 
-
-    area_increase_from_length(length) => begin
+    volume_increase_from_length(length) => begin
         # for garlic, see JH's thesis
         l = Cropbox.deunitfy(length)
         0.954957 + 2*0.005920l
-    end ~ track(u"cm^2")
+    end ~ track(u"cm^3")
+
+
+    potential_fruits(pheno.fruits_potential) ~ track
 
     #TODO better name, shared by growth_duration and potential_area
     #TODO should be a plant parameter not leaf (?)
-    rank_effect(rank, n=potential_leaves, weight=1) => begin
+    rank_effect(rank, n=potential_fruits, weight=1) => begin
         n_m = 5.93 + 0.33n # the rank of the largest leaf. YY
         a = (-10.61 + 0.25n) * weight
         b = (-5.99 + 0.27n) * weight
@@ -151,9 +74,9 @@ end
     # the unit of k is cm^2 (Fournier and Andrieu 1998 Pg239). YY
     # L_max is the length of the largest leaf when grown at T_peak. Here we assume LM_min is determined at growing Topt with minmal (generic) leaf no, SK 8/2011
     # If this routine runs before TI, totalLeaves = genericLeafNo, and needs to be run with each update until TI and total leaves are finalized, SK
-    GD(potential_length, LER_max): growth_duration => begin
+    GD(potential_length, FRER_max): growth_duration => begin
         # shortest possible linear phase duration in physiological time (days instead of GDD) modified
-        days = potential_length / LER_max
+        days = potential_length / FRER_max
         # for garlic
         1.5days
     end ~ track(u"d")
@@ -164,30 +87,18 @@ end
         -5.16 + 1.94rank
     end ~ track(min=0)
 
-    leaf_number_effect(potential_leaves) => begin
-        # Fig 4 of Birch et al. (1998)
-        exp(-1.17 + 0.047potential_leaves)
-    end ~ track(min=0.5, max=1.0)
+    # leaf_number_effect(potential_leaves) => begin
+    #     # Fig 4 of Birch et al. (1998)
+    #     exp(-1.17 + 0.047potential_leaves)
+    # end ~ track(min=0.5, max=1.0)
 
-    potential_area(potential_length, area_from_length) => begin
-        # for MAIZSIM
-        # equa 6. Fournier and Andrieu(1998) multiplied by Birch et al. (1998) leaf no effect
-        # LA_max the area of the largest leaf
-        # PotentialArea potential final area of a leaf with rank "n". YY
-        #self.maximum_area * self.leaf_number_effect * self.rank_effect(weight=1)
-        # for garlic
-        area_from_length(potential_length)
-    end ~ track(u"cm^2")
+    potential_volume(potential_length, volume_from_length) => begin
+        volume_from_length(potential_length)
+    end ~ track(u"cm^3")
 
-    green_ratio(senescence_ratio, detached) => begin
-        if !detached   
-            1 - senescence_ratio
-        else
-            0
-        end
-    end ~ track
+    fruit_green_ratio(senescence_ratio) => (1 - senescence_ratio) ~ track
 
-    green_area(green_ratio, area) => (green_ratio * area) ~ track(u"cm^2")
+    fruit_green_volume(fruit_green_ratio, volume) => (fruit_green_ratio * volume) ~ track(u"cm^3")
 
     #TODO implement Parent and Tardieu (2011, 2012) approach for leaf elongation in response to T and VPD, and normalized at 20C, SK, Nov 2012
     # elongAge indicates where it is now along the elongation stage or duration.
@@ -205,15 +116,10 @@ end
         c_m * ((t_et / t_em) * (t_tb / t_mb)^(t_mb / t_em))^delta
     end ~ call(u"cm/d")
 
-    potential_elongation_rate(beta_growth, elongation_age, LER_max, GD) => begin
+    actual_elongation_rate(beta_growth, elongation_age, FRER_max, GD) => begin
         #TODO proper integration with scipy.integrate?
-        beta_growth(elongation_age, GD, LER_max)
+        beta_growth(elongation_age, GD, FRER_max)
     end ~ track(when=growing, u"cm/d")
-
-    #TODO: incorporate stress effects
-    actual_elongation_rate(potential_elongation_rate, cold_injury_effect) => begin
-        potential_elongation_rate * cold_injury_effect
-    end ~ track(u"cm/d")
 
     temperature_effect_func(; T_grow(u"°C"), T_peak(u"°C"), T_base(u"°C")) => begin
         # T_peak is the optimal growth temperature at which the potential leaf size determined in calc_mophology achieved.
@@ -236,7 +142,7 @@ end
         1.0 # for garlic
     end ~ track
 
-    potential_expansion_rate(t=elongation_age, t_e=GD, w_max=potential_area) => begin
+    potential_expansion_rate(t=elongation_age, t_e=GD, w_max=potential_volume) => begin
         # t_e = 1.5 * w_max / c_m
         t = min(t, t_e)
         #FIXME can we introduce new w_max here when w_max in t_e (growth duration) supposed to be potential length?
@@ -249,9 +155,9 @@ end
         r = (t_e - t) / (t_e - t_m) * (t / t_m)^(t_m / (t_e - t_m))
         #FIXME dt here is physiological time, whereas timestep multiplied in potential_area_increase is chronological time
         c_m * r # dw/dt
-    end ~ track(u"cm^2/d")
+    end ~ track(u"cm^3/d")
 
-    potential_area_increase(area_from_length, length, actual_length_increase, area) => begin
+    potential_volume_increase(volume_from_length, length, actual_length_increase, volume) => begin
         ##area = max(0, water_effect * T_effect * self.potential_area * (1 + (t_e - self.elongation_age) / (t_e - t_m)) * (self.elongation_age / t_e)**(t_e / (t_e - t_m)))
         #maximum_expansion_rate = T_effect * self.potential_area * (2*t_e - t_m) / (t_e * (t_e - t_m)) * (t_m / t_e)**(t_m / (t_e - t_m))
         # potential leaf area increase without any limitations
@@ -261,8 +167,8 @@ end
         # for garlic
         #TODO need common framework dealing with derivatives
         #area_increase_from_length(actual_length_increase)
-        area_from_length(length + actual_length_increase) - area
-    end ~ track(when=growing, u"cm^2")
+        volume_from_length(length + actual_length_increase) - volume
+    end ~ track(when=growing, u"cm^3")
 
     # create a function which simulates the reducing in leaf expansion rate
     # when predawn leaf water potential decreases. Parameterization of rf_psil
@@ -294,7 +200,7 @@ end
     actual_length_increase(actual_elongation_rate) ~ capture(u"cm", time=elongation_age, timeunit=u"d")
 
     # actual area
-    area(water_potential_effect, carbon_effect, temperature_effect, area_from_length, length) => begin
+    volume(water_potential_effect, carbon_effect, temperature_effect, volume_from_length, length) => begin
         # See Kim et al. (2012) Agro J. for more information on how this relationship has been determined based on multiple studies and is applicable across environments
         #FIXME: unit of threshold kPa?
         we = water_potential_effect(-0.8657)
@@ -305,8 +211,8 @@ end
 
         # growth temperature effect is now included here, outside of potential area increase calculation
         #TODO water and carbon effects are not multiplicative?
-        min(we, ce) * te * area_from_length(length)
-    end ~ track(u"cm^2")
+        min(we, ce) * te * volume_from_length(length)
+    end ~ track(u"cm^3")
 
     #TODO remove if unnecessary
     # @property
@@ -377,19 +283,19 @@ end
         end
     end ~ track(min=0, max=1)
 
-    senescent_area(senescence_ratio, area) => begin
+    senescent_volume(senescence_ratio, volume) => begin
         # Leaf senescence accelerates with drought and heat. see http://www.agry.purdue.edu/ext/corn/news/timeless/TopLeafDeath.html
         # rate = self._growth_rate(self.senescence_age, self.senescence_duration)
         # rate * self.timestep * self.area
-        senescence_ratio * area
-    end ~ track(u"cm^2")
+        senescence_ratio * volume
+    end ~ track(u"cm^3")
 
-    SLA(area, mass): specific_leaf_area => begin
+    SFRV(volume, mass): specific_fruit_volume => begin
         # temporary for now - it should vary by age. Value comes from some of Soo's work
         #200.0
-        area / mass
-    end ~ track(u"cm^2/g")
-    LMA(SLA): leaf_mass_per_area => 1 / SLA ~ track(u"g/cm^2")
+        volume / mass
+    end ~ track(u"cm^3/g")
+    FRMV(SFRV): fruit_mass_per_volume => 1 / SFRV ~ track(u"g/cm^3")
 
     # Maturity
 
@@ -417,17 +323,12 @@ end
         true
     end ~ flag
 
-    appeared(rank, l=pheno.leaves_appeared) => (rank <= l) ~ flag
+    appeared(rank, l=pheno.fruits_appeared) => (rank <= l) ~ flag
 
     growing(appeared, mature) => (appeared && !mature) ~ flag
 
-    mature(elongation_age, GD, area, potential_area) => begin
-        elongation_age >= GD || area >= potential_area
-    end ~ flag
-
-
-    detached(l=pheno.leaves_appeared, LDR, mature, rank) => begin
-        (l - rank) >= LDR && mature
+    mature(elongation_age, GD, volume, potential_volume) => begin
+        elongation_age >= GD || volume >= potential_volume
     end ~ flag
 
     aging(mature, physiological_age, SG, maturity) => begin
@@ -443,9 +344,10 @@ end
         #senescence_age >= senescence_duration?
     end ~ flag
 
-    dropped(mature, dead, detached) => (mature && dead && !detached) ~ flag
+    dropped(mature, dead) => (mature && dead) ~ flag
 
+
+
+    #FIXME sheath biomass
+    mass => 0 ~ track(u"g")
 end
-
-
-## leaf area only calculate remaing leaf
