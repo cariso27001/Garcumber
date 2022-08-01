@@ -46,7 +46,7 @@ end
     # (Topt: 31C with Tbase = 9.8C using 0.564 cm/dd rate from Fournier 1998 paper above
     LER_max: maximum_elongation_rate => 12 ~ preserve(u"cm/d", parameter)
 
-    LM_min: minimum_length_of_longest_leaf => 60 ~ preserve(u"cm", parameter)
+    LM_min: minimum_length_of_longest_leaf => 15 ~ preserve(u"cm", parameter)
 
     # leaf lamina width to length ratio
     length_to_width_ratio => begin
@@ -56,7 +56,7 @@ end
     end ~ preserve(parameter)
 
     # leaf area coeff with respect to L*W (A_LW)
-    area_ratio => 0.75 ~ preserve(parameter)
+    area_ratio => 0.88 ~ preserve(parameter)
 
     # staygreen trait of the hybrid
     # stay green for this value times growth period after peaking before senescence begins
@@ -105,11 +105,13 @@ end
     #     iszero(l) ? l : 0.639945 + 0.954957l + 0.005920l^2
     # end ~ call(u"cm^2")
 
+    # Modify the eauation from https://www.researchgate.net/publication/250043427_Estimation_of_leaf_area_for_greenhouse_cucumber_by_linear_measurements_under_salinity_and_grafting
+
     area_from_length(; L(u"cm")) => begin
         #HACK ensure zero area for zero length
         # for garlic, see JH's thesis
         l = Cropbox.deunitfy(L)
-        iszero(l) ? l : 0.639945 + 0.954957l + 0.005920l^2
+        iszero(l) ? l : 1.05l^2 - 0.172l
     end ~ call(u"cm^2")
 
 
